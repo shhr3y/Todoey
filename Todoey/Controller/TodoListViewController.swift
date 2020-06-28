@@ -4,24 +4,25 @@
 //
 
 import UIKit
-import CoreData
+import RealmSwift
 
 class TodoListViewController: UITableViewController{
     
-    var itemArray = [Item]()
+    var realm = try! Realm()
+    
+    var todoItems: Results<Item>?
     var selectedCategory: Category? {
         didSet{
             loadItems()
         }
     }
-    let context  = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
     
     @IBOutlet var searchBar: UISearchBar!
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
-//        print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)) //For Directory where sqlite file is saved
+        //        print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)) //For Directory where sqlite file is saved
         searchBar.delegate = self
         
     }
@@ -30,7 +31,7 @@ class TodoListViewController: UITableViewController{
     
     // Return the number of rows for the table.
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return itemArray.count
+        return todoItems?.count ?? 1
     }
     
     // Provide a cell object for each row.
@@ -39,10 +40,13 @@ class TodoListViewController: UITableViewController{
         let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath)
         
         // Configure the cell’s contents.
-        let item = itemArray[indexPath.row]
-        cell.textLabel!.text = item.title
-        
-        cell.accessoryType = item.done ? .checkmark : .none
+        if let item = todoItems?[indexPath.row] {
+            cell.textLabel!.text = item.title
+            cell.accessoryType = item.done ? .checkmark : .none
+        }else{
+            cell.textLabel!.text = "No Items Added"
+            cell.accessoryType = .none
+        }
         
         return cell
     }
@@ -50,12 +54,17 @@ class TodoListViewController: UITableViewController{
     //MARK: - TableView Delegate Methods
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         
-        itemArray[indexPath.row].done = !itemArray[indexPath.row].done
-      
-//        context.delete(itemArray[indexPath.row])        // HERE ORDER MATTER!
-//        itemArray.remove(at: indexPath.row)
-        
-        self.saveItems()
+        if let item = todoItems?[indexPath.row]{
+            do{
+                try realm.write{
+                    item.done = !item.done      //to update checkmark
+                    realm.delete(item)          //to delete item
+                }
+            }catch{
+                print("update error: \(error)")
+            }
+        }
+        self.tableView.reloadData()
         tableView.deselectRow(at: indexPath, animated: true)
     }
     //MARK: - Add new items
@@ -67,16 +76,19 @@ class TodoListViewController: UITableViewController{
         let action = UIAlertAction(title: "Add Item", style: .default) { (action) in
             //Below code will be executed when the user clicks add item in the UIAlert
             if textField.text != "" {
-                
-                let newItem = Item(context: self.context)
-                newItem.title = textField.text!
-                newItem.done = false
-                newItem.parentCategory = self.selectedCategory
-                
-                self.itemArray.append(newItem)
-                
-                //saving data using user
-                self.saveItems()
+                if let currentCategory = self.selectedCategory {
+                    do{
+                        try self.realm.write{                        
+                            let newItem = Item()
+                            newItem.title = textField.text!
+                            newItem.dateCreated = Date()
+                            currentCategory.items.append(newItem)
+                        }
+                    }catch{
+                        print(error)
+                    }
+                }
+                self.tableView.reloadData()
             }
         }
         
@@ -88,30 +100,8 @@ class TodoListViewController: UITableViewController{
         present(alert, animated: true, completion: nil)
     }
     
-    func saveItems(){
-        do{
-            try self.context.save()
-        }catch{
-            print("Error saving context: ",error)
-        }
-        self.tableView.reloadData()
-    }
-    
-    func loadItems(with request: NSFetchRequest<Item> = Item.fetchRequest(), predicate:NSPredicate? = nil){
-        
-        let categoryPredicate = NSPredicate(format: "parentCategory.name MATCHES %@", selectedCategory!.name!)
-        
-        if let additonalPredicate = predicate {
-            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [additonalPredicate, categoryPredicate])
-        }else{
-            request.predicate = categoryPredicate
-        }
-        
-        do{
-            itemArray = try context.fetch(request)
-        }catch{
-            print("Error loading Items: \(error)")
-        }
+    func loadItems(){
+        todoItems = selectedCategory?.items.sorted(byKeyPath: "title", ascending: true)
         self.tableView.reloadData()
     }
 }
@@ -119,7 +109,6 @@ class TodoListViewController: UITableViewController{
 //MARK: - SearchBar Delegate
 extension TodoListViewController: UISearchBarDelegate{
     
-
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {    //For Live Updating
         if searchText == "" {
             loadItems()
@@ -128,31 +117,20 @@ extension TodoListViewController: UISearchBarDelegate{
             }
         }
         else{
-            let request: NSFetchRequest<Item> = Item.fetchRequest()
-            let predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!)
-            let sortDescriptor = NSSortDescriptor(key: "title", ascending: true)
-
-            request.sortDescriptors = [sortDescriptor]
-            
-            loadItems(with: request,predicate: predicate)
+            todoItems = todoItems?.filter("title CONTAINS[cd] %@", searchBar.text!).sorted(byKeyPath: "dateCreated", ascending: true)
+            tableView.reloadData()
         }
     }
     
-    //    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {   /// For Search Button Pressed
-    //        if searchBar.text != "" {
-    //            let request: NSFetchRequest<Item> = Item.fetchRequest()
-    //            let predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!)
-    //            let sortDescriptor = NSSortDescriptor(key: "title", ascending: true)
-    //
-    //            request.predicate = predicate
-    //            request.sortDescriptors = [sortDescriptor]
-    //
-    //            do{
-    //                itemArray = try context.fetch(request)
-    //            }catch{
-    //                print("Error loading Items: \(error)")
-    //            }
-    //            tableView.reloadData()
-    //        }
-    //    }
+//    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {   // For Search Button Pressed
+//        if searchBar.text != "" {
+//            todoItems = todoItems?.filter("title CONTAINS[cd] %@", searchBar.text!).sorted(byKeyPath: "title", ascending: true)
+//            print("aagya: \(searchBar.text!)")
+//        }else{
+//            loadItems()
+//            DispatchQueue.main.async {
+//                searchBar.resignFirstResponder()
+//            }
+//        }
+//    }
 }
