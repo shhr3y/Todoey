@@ -23,6 +23,11 @@ class CategoryViewController: SwipeTableViewController{
         
         tableView.rowHeight = 80.0
         tableView.separatorStyle = .none
+        
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        configureNavigationBar(largeTitleColor: .white, backgoundColor: .systemBlue, tintColor: .white, title: "Todoey", preferredLargeTitle: true)
     }
     
     // MARK: - TableView DataSource Methods
@@ -39,6 +44,7 @@ class CategoryViewController: SwipeTableViewController{
         if let category = categories?[indexPath.row]{
             cell.backgroundColor = UIColor(hexString: category.hexColour)
             cell.textLabel?.text = category.name
+            cell.textLabel?.textColor = ContrastColorOf(cell.backgroundColor!, returnFlat: true)
         }else{
             cell.backgroundColor = UIColor(hexString: "1D9BF6")
             cell.textLabel?.text = "No Categories added yet."

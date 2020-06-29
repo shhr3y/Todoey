@@ -5,6 +5,7 @@
 
 import UIKit
 import RealmSwift
+import ChameleonFramework
 
 class TodoListViewController: SwipeTableViewController{
     
@@ -27,8 +28,15 @@ class TodoListViewController: SwipeTableViewController{
         
         tableView.rowHeight = 80.0
         tableView.separatorStyle = .none
+        
     }
     
+    override func viewWillAppear(_ animated: Bool) {
+        configureNavigationBar(largeTitleColor: .white, backgoundColor: UIColor(hexString: selectedCategory!.hexColour) ?? UIColor.systemBlue, tintColor: .white, title: selectedCategory?.name ?? "Items", preferredLargeTitle: true)
+//        searchBar.searchBarStyle = .minimal
+        searchBar.barTintColor = UIColor(hexString: selectedCategory!.hexColour) ?? UIColor.green
+        searchBar.searchTextField.placeholder = "Search \(selectedCategory?.name ?? "Items")"
+    }
     //MARK: - TableView DataSource Methods
     
     // Return the number of rows for the table.
@@ -41,10 +49,17 @@ class TodoListViewController: SwipeTableViewController{
         // Fetch a cell of the appropriate type.
         let cell = super.tableView(tableView, cellForRowAt: indexPath)
         
-        // Configure the cell’s contents.
+        // Cosnfigure the cell’s contents.
         if let item = todoItems?[indexPath.row] {
+            let color = UIColor(hexString: selectedCategory!.hexColour)?.darken(byPercentage: CGFloat(CGFloat(indexPath.row) / (CGFloat(todoItems!.count)/0.30)))
+//            CGFloat(CGFloat(indexPath.row) / CGFloat(todoItems!.count))           ////MY VERSION
+//            CGFloat(Double(indexPath.row) * 0.10)                                 ////ANGELA VERSION
+                
             cell.textLabel?.text = item.title
+            cell.textLabel?.textColor = ContrastColorOf(color!, returnFlat: true)
+            cell.backgroundColor = color
             cell.accessoryType = item.done ? .checkmark : .none
+            
         }else{
             cell.textLabel?.text = "No Items Added"
             cell.accessoryType = .none
