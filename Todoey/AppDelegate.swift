@@ -20,6 +20,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             print("Realm Error: \(error)")
         }
         
+//        print(Realm.Configuration.defaultConfiguration.fileURL)
+        
         
         return true
     }

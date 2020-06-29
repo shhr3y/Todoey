@@ -6,7 +6,7 @@
 import UIKit
 import RealmSwift
 
-class TodoListViewController: UITableViewController{
+class TodoListViewController: SwipeTableViewController{
     
     var realm = try! Realm()
     
@@ -25,6 +25,8 @@ class TodoListViewController: UITableViewController{
         //        print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)) //For Directory where sqlite file is saved
         searchBar.delegate = self
         
+        tableView.rowHeight = 80.0
+        tableView.separatorStyle = .none
     }
     
     //MARK: - TableView DataSource Methods
@@ -37,14 +39,14 @@ class TodoListViewController: UITableViewController{
     // Provide a cell object for each row.
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         // Fetch a cell of the appropriate type.
-        let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath)
+        let cell = super.tableView(tableView, cellForRowAt: indexPath)
         
         // Configure the cell’s contents.
         if let item = todoItems?[indexPath.row] {
-            cell.textLabel!.text = item.title
+            cell.textLabel?.text = item.title
             cell.accessoryType = item.done ? .checkmark : .none
         }else{
-            cell.textLabel!.text = "No Items Added"
+            cell.textLabel?.text = "No Items Added"
             cell.accessoryType = .none
         }
         
@@ -58,7 +60,7 @@ class TodoListViewController: UITableViewController{
             do{
                 try realm.write{
                     item.done = !item.done      //to update checkmark
-                    realm.delete(item)          //to delete item
+//                    realm.delete(item)          //to delete item
                 }
             }catch{
                 print("update error: \(error)")
@@ -67,7 +69,7 @@ class TodoListViewController: UITableViewController{
         self.tableView.reloadData()
         tableView.deselectRow(at: indexPath, animated: true)
     }
-    //MARK: - Add new items
+    //MARK: - Add Button Function
     @IBAction func addButtonPressed(_ sender: UIBarButtonItem) {
         var textField = UITextField()
         
@@ -99,10 +101,22 @@ class TodoListViewController: UITableViewController{
         }
         present(alert, animated: true, completion: nil)
     }
-    
+    //MARK: - Data Manupulation
     func loadItems(){
         todoItems = selectedCategory?.items.sorted(byKeyPath: "title", ascending: true)
         self.tableView.reloadData()
+    }
+    //MARK: - Delete Data from Swipe
+    override func updateModel(at indexPath: IndexPath) {
+        if let itemForDeletion = self.todoItems?[indexPath.row]{
+            do{
+                try self.realm.write{
+                    self.realm.delete(itemForDeletion)          //to delete item
+                }
+            }catch{
+                print("update error: \(error)")
+            }
+        }
     }
 }
 
@@ -121,16 +135,4 @@ extension TodoListViewController: UISearchBarDelegate{
             tableView.reloadData()
         }
     }
-    
-//    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {   // For Search Button Pressed
-//        if searchBar.text != "" {
-//            todoItems = todoItems?.filter("title CONTAINS[cd] %@", searchBar.text!).sorted(byKeyPath: "title", ascending: true)
-//            print("aagya: \(searchBar.text!)")
-//        }else{
-//            loadItems()
-//            DispatchQueue.main.async {
-//                searchBar.resignFirstResponder()
-//            }
-//        }
-//    }
 }
